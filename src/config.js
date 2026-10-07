@@ -19,3 +19,7 @@ export const RESTART_LOSS_SEC = 45; // 信号待ちからの再発車ロス
 export const UNFINISHED_PENALTY_SEC = 600; // 打ち切り時に未到着の列車へ加える遅延
 
 export const PAX = { S: 1300, R: 1000, L: 700 }; // 種別ごとの乗客数
+
+export const MAX_FRAME_TICKS = 400; // 1フレームで進めるティックの上限（SPEC §3.1）
+
+export const TYPE_NAMES = { S: '速達', R: '快速', L: '各停' }; // 画面に出す種別名
