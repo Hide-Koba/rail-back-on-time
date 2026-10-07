@@ -420,7 +420,7 @@ export default {
 ```
 index.html
 style.css
-package.json            # "type": "module", "scripts": { "test": "node --test tests/" }。依存パッケージなし
+package.json            # "type": "module", "scripts": { "test": "node --test" }。依存パッケージなし（`tests/` 付きだと Node 21 以降で失敗するため付けない。docs/DECISIONS.md 参照）
 .claude/launch.json     # プレビュー用: python3 -m http.server 8000
 src/
   main.js               # 起動、画面遷移、ゲームループ
