@@ -83,3 +83,19 @@ export function nextRouteChoice(state, train, station) {
   const i = valid.findIndex((t) => t.id === current);
   return valid[(i + 1) % valid.length].id;
 }
+
+/** 列車が次に着く（または今向かっている）駅の index。終点に着いたあとなど、次がなければ null。 */
+export function nextStationIndex(state, train) {
+  if (train.resId == null) return null;
+  const { resources, stations } = state.layout;
+  const res = resources[train.resId];
+  let i;
+  if (res.kind === 'block') {
+    i = res.segment;
+  } else {
+    const st = stations[res.stationIndex];
+    const reachedCenter = train.status === 'dwelling' || train.status === 'turnaround' || train.km >= st.km;
+    i = reachedCenter ? res.stationIndex + 1 : res.stationIndex;
+  }
+  return i < stations.length ? i : null;
+}

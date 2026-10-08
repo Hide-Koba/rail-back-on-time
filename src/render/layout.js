@@ -94,3 +94,55 @@ export function trainPosition(geo, sim, train) {
   const shift = f < b ? dx * (f / b) : f > 1 - b ? dx * ((1 - f) / b) : dx; // 入口と出口の斜めの部分
   return { x: geo.cx + shift, y: st.boxTop + f * STATION_BOX_PX };
 }
+
+/**
+ * 駅の箱の中で、路線から番線へ入る経路（SVG の path の d）。入口で斜めに分岐し、出口で合流する。
+ * 終点は合流せず行き止まり。
+ */
+export function trackPath(geo, sim, track) {
+  const st = sim.stations[track.stationIndex];
+  const gs = geo.stations[track.stationIndex];
+  const x = geo.cx + gs.trackDx[track.id];
+  const yA = gs.boxTop + STATION_BOX_PX * BRANCH_RATIO;
+  const yB = gs.boxTop + STATION_BOX_PX * (1 - BRANCH_RATIO);
+  const head = `M ${geo.cx} ${gs.boxTop} L ${x} ${yA} L ${x} ${yB}`;
+  return st.isTerminal ? head : `${head} L ${geo.cx} ${gs.boxBottom}`;
+}
+
+export const TRAIN_HIT_PX = 24; // 列車のタップ判定の半径
+export const POINT_HIT_PX = 44; // ポイントのタップ領域の一辺（44×44px 以上）
+const POINT_OFFSET_X = 50; // ポイントのアイコンを、路線から右へずらす量（駅に入る列車の文字と重ならない位置）
+
+/** ポイントのアイコンの中心。各駅の入口（駅の箱の上端）の、路線の右に置く。 */
+export function pointCenter(geo, stationIndex) {
+  return { x: geo.cx + POINT_OFFSET_X, y: geo.stations[stationIndex].boxTop - 6 };
+}
+
+/** 列車の「中心」（先頭から本体の真ん中）。タップ判定と、輪の位置に使う。 */
+export function trainCenter(geo, sim, train) {
+  const p = trainPosition(geo, sim, train);
+  return p && { x: p.x, y: p.y - 11 };
+}
+
+/** タップした位置に最も近い列車（中心から TRAIN_HIT_PX 以内）。なければ null。 */
+export function hitTestTrain(geo, sim, trains, x, y, radius = TRAIN_HIT_PX) {
+  let best = null;
+  let bestD = radius;
+  for (const t of trains) {
+    const c = trainCenter(geo, sim, t);
+    if (!c) continue;
+    const d = Math.hypot(c.x - x, c.y - y);
+    if (d <= bestD) { best = t; bestD = d; }
+  }
+  return best;
+}
+
+/** タップした位置にあるポイントの駅 index。なければ null。 */
+export function hitTestPoint(geo, x, y) {
+  const half = POINT_HIT_PX / 2;
+  for (const st of geo.stations) {
+    const c = pointCenter(geo, st.index);
+    if (Math.abs(x - c.x) <= half && Math.abs(y - c.y) <= half) return st.index;
+  }
+  return null;
+}

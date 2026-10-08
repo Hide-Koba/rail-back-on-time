@@ -29,7 +29,7 @@ test('T1: 停車駅・通過駅・終点の定刻が §3.8 の式どおり', () 
 
   // S1: 全駅通過。通過時刻 = 駅中心を通る時刻（到着 = 発車）
   const S = tt.S1;
-  const s1Entry = 10 * 3600 + 90;
+  const s1Entry = stage1.trains.find((t) => t.id === 'S1').entrySec; // 初期遅延 0 なので、定刻の入線時刻 = 実際の入線時刻
   near(S.byStation.aoba.arrSec, s1Entry + sec(10), 1e-6, 'S1 青葉 通過');
   near(S.byStation.aoba.depSec, s1Entry + sec(10), 1e-6, 'S1 青葉 通過(発)');
   near(S.byStation.shirasagi.arrSec, s1Entry + sec(30), 1e-6, 'S1 白鷺 通過');

@@ -7,9 +7,10 @@ export const formatClock = (sec) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 };
 
-export function createHud(root, { title, onTogglePause, onSpeed }) {
+export function createHud(root, { title, onTogglePause, onSpeed, onBack }) {
   root.innerHTML = `
     <div class="hud-row">
+      <button type="button" class="hud-back" aria-label="ステージ選択へ戻る">‹</button>
       <div class="hud-title"></div>
       <div class="hud-clock" aria-label="現在時刻"></div>
       <div class="hud-delay" aria-label="総遅延"><span class="hud-delay-label">総遅延</span> <b></b><span class="hud-delay-unit">分</span></div>
@@ -26,6 +27,7 @@ export function createHud(root, { title, onTogglePause, onSpeed }) {
   const speedBtns = [...root.querySelectorAll('.btn-speed')];
   titleEl.textContent = title;
 
+  $('.hud-back').addEventListener('click', onBack);
   pauseBtn.addEventListener('click', onTogglePause);
   speedBtns.forEach((b) => b.addEventListener('click', () => onSpeed(Number(b.dataset.speed))));
 
@@ -35,12 +37,13 @@ export function createHud(root, { title, onTogglePause, onSpeed }) {
   };
 
   return {
-    update({ clockSec, totalDelayMin, paused, speedIndex, finished }) {
+    /** blocked: チュートリアルの案内で自動的に止まっている */
+    update({ clockSec, totalDelayMin, paused, speedIndex, finished, blocked }) {
       setText('clock', clockEl, formatClock(clockSec));
       setText('delay', delayEl, String(totalDelayMin));
-      setText('pause', pauseBtn, finished ? '終了' : paused ? '▶ 再開' : '⏸ 一時停止');
-      pauseBtn.disabled = finished;
-      pauseBtn.classList.toggle('on', paused && !finished);
+      setText('pause', pauseBtn, finished ? '終了' : blocked ? '案内を確認' : paused ? '▶ 再開' : '⏸ 一時停止');
+      pauseBtn.disabled = finished || blocked;
+      pauseBtn.classList.toggle('on', (paused || blocked) && !finished);
       speedBtns.forEach((b, i) => b.classList.toggle('on', i === speedIndex));
     },
   };

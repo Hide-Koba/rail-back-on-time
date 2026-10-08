@@ -27,20 +27,22 @@ function setRoute(state, train, stationId, trackId) {
   return true;
 }
 
-function hold(state, train) {
-  if (train.status === 'queued' || train.status === 'turnaround' || train.status === 'done') return false;
+/**
+ * hold が効くときの動作。効かないなら null。
+ *   { mode: 'now' }                … その場で抑止（停車中、または駅中心の手前を走行中）
+ *   { mode: 'reserve', stationId } … 次の駅に抑止を予約する
+ */
+export function holdPlan(state, train) {
+  if (train.status === 'queued' || train.status === 'turnaround' || train.status === 'done') return null;
   const { resources, stations } = state.layout;
   const res = resources[train.resId];
 
   let target; // 抑止を予約する駅の index
   if (res.kind === 'track') {
     const st = stations[res.stationIndex];
-    if (st.isTerminal) return false;
+    if (st.isTerminal) return null;
     // 停車中、または駅中心の手前を走行中: その場で抑止（通過中なら駅中心で運転停車になる）
-    if (train.status === 'dwelling' || train.km < st.km) {
-      train.held = true;
-      return true;
-    }
+    if (train.status === 'dwelling' || train.km < st.km) return { mode: 'now' };
     // 駅中心を過ぎて出ていく途中の列車は、次の駅に予約する（区間を走っているのと同じ扱い）
     target = res.stationIndex + 1;
   } else {
@@ -48,9 +50,31 @@ function hold(state, train) {
   }
 
   const st = stations[target];
-  if (!st || st.isTerminal) return false; // 終点に向かっている列車には効かない
-  train.holdAt = st.id;
+  if (!st || st.isTerminal) return null; // 終点に向かっている列車には効かない
+  return { mode: 'reserve', stationId: st.id };
+}
+
+function hold(state, train) {
+  const plan = holdPlan(state, train);
+  if (!plan) return false;
+  if (plan.mode === 'now') train.held = true;
+  else train.holdAt = plan.stationId;
   return true;
+}
+
+/**
+ * 詳細パネルの抑止ボタンの状態。
+ *   'release'  … 抑止中、または予約中 →「抑止解除」
+ *   'hold'     … その場で抑止できる →「抑止」
+ *   'holdNext' … 区間を走行中で、次の駅に予約する →「次駅で抑止」
+ *   'none'     … 抑止できない（終点に向かっている・終点・入線待ち など）
+ */
+export function holdAction(state, train) {
+  if (train.status === 'queued' || train.status === 'turnaround' || train.status === 'done') return 'none';
+  if (train.held || train.holdAt) return 'release';
+  const plan = holdPlan(state, train);
+  if (!plan) return 'none';
+  return plan.mode === 'now' ? 'hold' : 'holdNext';
 }
 
 function release(train) {

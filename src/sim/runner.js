@@ -51,7 +51,18 @@ export function summarize(state) {
   };
 }
 
-/** ベースライン（操作なし）の遅延損失。決定的なので毎回同じ値になる。 */
+const baselineCache = new Map();
+
+/** ベースライン（操作なし）の結果。決定的なので、ステージごとに1回だけ計算して使い回す。 */
+export function baselineResult(stage) {
+  if (!baselineCache.has(stage.id)) {
+    const { loss, finalDelaySec, onTimeRate } = runHeadless(stage);
+    baselineCache.set(stage.id, { loss, finalDelaySec, onTimeRate });
+  }
+  return baselineCache.get(stage.id);
+}
+
+/** ベースライン（操作なし）の遅延損失。 */
 export function baselineLoss(stage) {
-  return runHeadless(stage).loss;
+  return baselineResult(stage).loss;
 }

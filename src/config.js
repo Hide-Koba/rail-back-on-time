@@ -15,7 +15,7 @@ export const ROUTE_LOCK_KM = 2.0; // 進路が確定する距離（駅の上端�
 export const MIN_DWELL_SEC = 150; // 最短停車時間（加減速ロスを含む）
 export const SCHED_DWELL_SEC = 210; // ダイヤ上の停車時間（同上）
 export const OP_STOP_MIN_SEC = 90; // 運転停車の最短時間
-export const RESTART_LOSS_SEC = 45; // 信号待ちからの再発車ロス
+export const RESTART_LOSS_SEC = 120; // 信号待ちからの再発車ロス
 export const UNFINISHED_PENALTY_SEC = 600; // 打ち切り時に未到着の列車へ加える遅延
 
 export const PAX = { S: 1300, R: 1000, L: 700 }; // 種別ごとの乗客数
