@@ -146,3 +146,16 @@ export function hitTestPoint(geo, x, y) {
   }
   return null;
 }
+
+/** km の地点の画面の y。駅の中は、駅の箱の高さいっぱいに対応させる（列車の座標と同じ対応）。線路の外は両端に丸める。 */
+export function kmToY(geo, sim, km) {
+  for (const st of sim.stations) {
+    if (km >= st.upperKm && km <= st.lowerKm) {
+      return geo.stations[st.index].boxTop + ((km - st.upperKm) / (st.lowerKm - st.upperKm)) * STATION_BOX_PX;
+    }
+  }
+  for (const seg of sim.segments) {
+    if (km >= seg.startKm && km <= seg.endKm) return geo.segments[seg.index].y0 + (km - seg.startKm) * geo.pxPerKm;
+  }
+  return km < sim.segments[0].startKm ? geo.entryY : geo.stations.at(-1).boxBottom;
+}

@@ -23,3 +23,7 @@ export const PAX = { S: 1300, R: 1000, L: 700 }; // 種別ごとの乗客数
 export const MAX_FRAME_TICKS = 400; // 1フレームで進めるティックの上限（SPEC §3.1）
 
 export const TYPE_NAMES = { S: '速達', R: '快速', L: '各停' }; // 画面に出す種別名
+
+// ---- M4: 指令カード・イベント ----
+export const CANCEL_DELAY_SEC = 3600; // 運休した列車の遅延損失は「乗客数 × 60分」（遅延60分として数える）
+export const SHORTEN_TURNAROUND_RATIO = 0.5; // 折返し短縮: 終点の折り返し時間にかける割合

@@ -15,6 +15,7 @@ export function createGame(stage) {
  * 操作の予定 schedule を実行して結果を返す。
  *   { atSec, command }              … ゲーム内時刻が atSec になったティックで1回だけ
  *   { when(state), command, once }  … 条件が成り立ったティックで。once は省略すると true（1回だけ）
+ * command は、コマンドそのものでも、state からコマンドを作る関数でもよい（関数が null を返したら、そのティックは何もしない）。
  * options.onTick(state) は step() のたびに呼ばれる（不変条件の検査などに使う）。
  */
 export function runHeadless(stage, schedule = [], options = {}) {
@@ -29,7 +30,9 @@ export function runHeadless(stage, schedule = [], options = {}) {
       if (e.fired && (e.atSec !== undefined || (e.once ?? true))) continue;
       const due = e.atSec !== undefined ? state.timeSec >= e.atSec : e.when(state);
       if (!due) continue;
-      commands.push(e.command);
+      const command = typeof e.command === 'function' ? e.command(state) : e.command;
+      if (!command) continue;
+      commands.push(command);
       e.fired = true;
     }
     step(state, commands);

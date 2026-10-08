@@ -11,6 +11,7 @@ import { createBoard, delayMinutes } from './render/board.js';
 import { createHud } from './render/hud.js';
 import { createPanel } from './render/panel.js';
 import { createTutorialView } from './render/tutorial.js';
+import { createToasts, noticeText } from './render/notices.js';
 
 /**
  * ステージを開始する。onFinish({ session, result, baseline, rate, stars }) は終了時に1回だけ呼ぶ。
@@ -28,6 +29,7 @@ export function startPlay(stage, { onFinish, onExit }) {
   let last = performance.now();
   let reported = false;
   let destroyed = false;
+  let noticeIndex = state.notices.length; // 開始前（warmup 中）の出来事は知らせない
 
   const $ = (id) => document.getElementById(id);
   const hud = createHud($('hud'), {
@@ -44,8 +46,11 @@ export function startPlay(stage, { onFinish, onExit }) {
   const panel = createPanel($('panel'), {
     onHold: (trainId) => issue({ type: 'hold', trainId }),
     onRelease: (trainId) => issue({ type: 'release', trainId }),
+    onCancel: (trainId) => issue({ type: 'cancel', trainId }), // 指令カード: 運休
+    onShorten: (trainId) => issue({ type: 'shortenTurnaround', trainId }), // 指令カード: 折返し短縮
     onClose: () => { session.selectedId = null; draw(); },
   });
+  const toasts = createToasts($('toasts'));
   const tutorialView = createTutorialView($('tutorial'), { onTap: () => { tutorial.tap(); draw(); } });
   const board = createBoard($('board-scroll'), state, {
     onTrainTap: (trainId) => { session.selectedId = trainId; draw(); },
@@ -81,6 +86,7 @@ export function startPlay(stage, { onFinish, onExit }) {
     board.render(state, { selectedId: session.selectedId, focusId: tutorial.step?.focus ?? null });
     panel.update(state, session.selectedId ? state.trainById[session.selectedId] : null);
     tutorialView.update(tutorial.step);
+    for (; noticeIndex < state.notices.length; noticeIndex++) toasts.push(noticeText(state, state.notices[noticeIndex]));
     hud.update({
       clockSec: state.timeSec,
       totalDelayMin: totalDelayMin(),
@@ -88,6 +94,7 @@ export function startPlay(stage, { onFinish, onExit }) {
       speedIndex: session.speedIndex,
       finished: state.finished,
       blocked: tutorial.blocking,
+      cards: stage.cards ? state.cards : null,
     });
   }
 
@@ -139,6 +146,7 @@ export function startPlay(stage, { onFinish, onExit }) {
     $('panel').hidden = true;
     $('stage-area').classList.remove('has-panel');
     $('tutorial').hidden = true;
+    toasts.clear();
   }
 
   draw(); // 最初のフレームを待たずに描く

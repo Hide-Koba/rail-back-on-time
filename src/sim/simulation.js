@@ -11,7 +11,8 @@ import {
   UNFINISHED_PENALTY_SEC,
 } from '../config.js';
 import { applyCommand } from './commands.js';
-import { lockRoute } from './dispatch.js';
+import { lockRoute, inspectionPendingAt } from './dispatch.js';
+import { finalizeCancel } from './cards.js';
 import { delaySec } from './timetable.js';
 
 export function step(state, commands = []) {
@@ -28,8 +29,36 @@ export function step(state, commands = []) {
   for (const train of active) processTrain(state, train);
 
   state.timeSec += DT_SEC;
+  updateEvents(state);
   checkFinished(state);
   return state;
+}
+
+/** 速度規制の開始・終了を通知に載せる（画面が「いま規制中」と知らせるため）。 */
+function updateEvents(state) {
+  const events = state.stage.events ?? [];
+  events.forEach((ev, i) => {
+    if (ev.type !== 'speedLimit') return;
+    const phase = state.eventPhase[i];
+    if (phase === 'pending' && state.timeSec >= ev.fromSec) {
+      state.eventPhase[i] = 'active';
+      state.notices.push({ t: state.timeSec, kind: 'limitStart', event: i });
+    }
+    if (state.eventPhase[i] === 'active' && state.timeSec >= ev.toSec) {
+      state.eventPhase[i] = 'ended';
+      state.notices.push({ t: state.timeSec, kind: 'limitEnd', event: i });
+    }
+  });
+}
+
+/** km の地点・いまの時刻に効いている速度規制の上限 [km/h]。なければ Infinity。 */
+export function speedLimitAt(state, km, now) {
+  let limit = Infinity;
+  for (const ev of state.stage.events ?? []) {
+    if (ev.type !== 'speedLimit') continue;
+    if (now >= ev.fromSec && now < ev.toSec && km >= ev.fromKm && km <= ev.toKm) limit = Math.min(limit, ev.kmh);
+  }
+  return limit;
 }
 
 const mainFirst = (state, t) => {
@@ -83,7 +112,8 @@ function processTrain(state, train) {
   }
 
   // running
-  const speedKmh = delaySec(state, train, now) > 0 ? MAX_SPEED_KMH : SCHED_SPEED_KMH;
+  const baseKmh = delaySec(state, train, now) > 0 ? MAX_SPEED_KMH : SCHED_SPEED_KMH;
+  const speedKmh = Math.min(baseKmh, speedLimitAt(state, train.km, now)); // 速度規制があれば、規制値との小さい方
   advance(state, train, (speedKmh * DT_SEC) / 3600);
 }
 
@@ -96,6 +126,7 @@ function lockRouteIfNear(state, train) {
 
 function canDepart(state, train, now) {
   if (train.held) return false;
+  if (train.inspectionUntil != null && now < train.inspectionUntil) return false; // 点検中
   if (train.dwellKind === 'sched') {
     const stId = state.layout.resources[train.resId].stationId;
     if (now - train.arrivedSec < MIN_DWELL_SEC) return false;
@@ -121,9 +152,9 @@ function nextResourceId(state, train) {
   return station.isTerminal ? null : segments[station.index + 1].blockIds[0];
 }
 
-/** この駅の番線で、駅中心で止まるか（定期停車・終点・抑止中）。 */
+/** この駅の番線で、駅中心で止まるか（定期停車・終点・抑止中・これから点検）。 */
 function stopsAt(train, station) {
-  return station.isTerminal || train.stops.includes(station.id) || train.held;
+  return station.isTerminal || train.stops.includes(station.id) || train.held || inspectionPendingAt(train, station);
 }
 
 /** dKm だけ進める。リソースの境界では、空いていれば入って余りを進め、ふさがっていれば止まる。 */
@@ -185,6 +216,11 @@ function enter(state, train, nextId) {
 
 function arrive(state, train, station, tEnd) {
   train.arrivedSec = tEnd;
+  if (train.cancelPending) {
+    // 運休: この停車駅（終点なら折り返しをせずに）で打ち切り、番線を空ける
+    finalizeCancel(state, train);
+    return;
+  }
   if (station.isTerminal) {
     train.status = 'turnaround';
     train.held = false;
@@ -194,6 +230,12 @@ function arrive(state, train, station, tEnd) {
   } else {
     train.status = 'dwelling';
     train.dwellKind = train.stops.includes(station.id) ? 'sched' : 'op';
+    if (inspectionPendingAt(train, station)) {
+      // 車両点検: 指定の時間、臨時停車する（プレイヤーは解除できない）
+      train.inspection.started = true;
+      train.inspectionUntil = tEnd + train.inspection.durationSec;
+      state.notices.push({ t: state.timeSec, kind: 'inspection', trainId: train.id, stationId: station.id });
+    }
   }
 }
 

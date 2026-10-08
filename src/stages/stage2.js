@@ -62,6 +62,15 @@ export default {
     train('S104', 'S', 104, 18, 38, 0),
     train('S48', 'S', 48, 18, 41, 0),
   ],
-  stars: { two: 0.10, three: 0.20 }, // 仮。M3 で遊んでから決める
+  // 指令カード（SPEC §9 M4）: 運休=次の停車駅で打ち切り、折返し短縮=終点の折り返し時間を半分に
+  cards: { cancel: 2, shorten: 3 },
+  // イベント（決まった内容。乱数なし）
+  events: [
+    // 湖南〜古都の強風による速度規制
+    { type: 'speedLimit', label: '強風', fromKm: 35, toKm: 68, kmh: 170, fromSec: hm(18, 50), toSec: hm(19, 25) },
+    // 快速 718 は、通過のはずの湖南で車両点検のため臨時停車（6分）
+    { type: 'inspection', trainId: 'R718', stationId: 'konan', durationSec: min(6), label: '車両点検' },
+  ],
+  stars: { two: 0.10, three: 0.18 }, // 運休2本（L844・R660）＋折返し短縮3回で21%、最良の組み合わせで23%。人の操作は最良より少し劣る前提
   tutorial: [],
 };

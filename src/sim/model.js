@@ -79,6 +79,26 @@ export function createState(stage) {
   const layout = buildLayout(stage);
   const stationIds = new Set(layout.stations.filter((s) => !s.isTerminal).map((s) => s.id));
 
+  const events = stage.events ?? [];
+  const inspections = new Map(); // trainId -> 点検の予定
+  for (const ev of events) {
+    if (ev.type === 'speedLimit') {
+      if (!(ev.fromKm < ev.toKm) || !(ev.fromSec < ev.toSec) || !(ev.kmh > 0)) {
+        throw new Error(`速度規制の指定が不正です: ${ev.label ?? ''}`);
+      }
+    } else if (ev.type === 'inspection') {
+      if (!stationIds.has(ev.stationId)) throw new Error(`${ev.trainId}: 点検の駅が不正です: ${ev.stationId}`);
+      if (!(ev.durationSec > 0)) throw new Error(`${ev.trainId}: 点検の時間が不正です`);
+      if (inspections.has(ev.trainId)) throw new Error(`${ev.trainId}: 点検は1本につき1回までです`);
+      inspections.set(ev.trainId, { stationId: ev.stationId, durationSec: ev.durationSec, started: false });
+    } else {
+      throw new Error(`不明なイベントです: ${ev.type}`);
+    }
+  }
+  for (const id of inspections.keys()) {
+    if (!stage.trains.some((t) => t.id === id)) throw new Error(`点検の列車が存在しません: ${id}`);
+  }
+
   const trains = stage.trains.map((def) => {
     for (const id of def.stops) {
       if (!stationIds.has(id)) throw new Error(`${def.id}: 停車駅が不正です: ${id}`);
@@ -110,8 +130,14 @@ export function createState(stage) {
       arrivedSec: null,
       freeSince: null, // signal 中、次のリソースが空いているのを見つけた時刻
       turnaroundEndSec: null,
+      turnaroundShortened: false, // 折返し短縮を使った
       finalDelaySec: null,
       unfinished: false,
+
+      cancelPending: false, // 運休カードを使った（次の停車駅で消える）
+      cancelled: false, // 運休で盤面から消えた
+      inspection: inspections.get(def.id) ?? null, // 車両点検の予定 { stationId, durationSec, started }
+      inspectionUntil: null, // 点検の臨時停車が終わる時刻
     };
   });
 
@@ -133,6 +159,9 @@ export function createState(stage) {
     trains,
     trainById,
     occ, // resId -> trainId | null
+    cards: { cancel: stage.cards?.cancel ?? 0, shorten: stage.cards?.shorten ?? 0 }, // 指令カードの残り回数
+    eventPhase: events.map(() => 'pending'), // 各イベント: 'pending' → 'active' → 'ended'
+    notices: [], // 画面に知らせる出来事 { t, kind, ... }（画面側が、まだ見ていない分だけ読む）
     finished: false,
     endReason: null, // 'completed' | 'timeout'
   };

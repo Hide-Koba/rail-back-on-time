@@ -145,7 +145,7 @@ svg.board { display: block; font-family: var(--font); }
 }
 
 /* ---- 盤面: ポイント・経路・選択・抑止 ---- */
-#stage-area.has-panel #board-scroll { padding-bottom: 176px; } /* 下のパネルに隠れた部分もスクロールで見える */
+#stage-area.has-panel #board-scroll { padding-bottom: calc(var(--panel-h, 160px) + 16px); } /* 下のパネルに隠れた部分もスクロールで見える */
 
 .point-bg { fill: #fff; stroke: var(--c-line-weak); stroke-width: 1.5; }
 .point-symbol { fill: none; stroke: var(--c-line-weak); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -290,3 +290,36 @@ svg.board { display: block; font-family: var(--font); }
 }
 .btn-big.ghost { background: #fff; color: var(--c-header); border: 1.5px solid var(--c-header); }
 .btn-big:disabled { background: #D9DDE4; color: var(--c-text-weak); cursor: default; }
+
+/* ---- M4: 指令カード・イベント ---- */
+.hud-cards { margin-top: 6px; font-size: 12px; color: rgba(255, 255, 255, 0.85); }
+
+.limit-band { fill: #FFB300; opacity: 0.38; pointer-events: none; }
+.limit.soon .limit-band { fill: none; stroke: #FFB300; stroke-width: 2; stroke-dasharray: 5 4; opacity: 0.9; }
+.limit-label { font-size: 11px; font-weight: 700; fill: #8A5A00; paint-order: stroke; stroke: var(--c-board); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+.limit.soon .limit-label { font-weight: 400; }
+
+.badge.cancel .badge-bg { fill: #6A1B9A; }
+.badge.inspect .badge-bg { fill: #00796B; }
+
+.panel-event { margin-top: 6px; padding: 5px 8px; border-radius: 8px; background: #E0F2F1; color: #00574B; font-size: 12px; line-height: 1.4; }
+.panel-cards { display: flex; gap: 8px; margin-top: 8px; }
+.btn-card {
+  flex: 1;
+  min-height: 40px;
+  border: 1.5px solid #6A1B9A;
+  border-radius: 10px;
+  background: #fff;
+  color: #6A1B9A;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn-card.card-shorten { border-color: var(--c-line); color: var(--c-line); }
+.btn-card.armed { background: #6A1B9A; color: #fff; }
+.btn-card:disabled { border-color: #D9DDE4; color: #9AA3B5; background: #F5F6F8; cursor: default; }
+
+#toasts { position: absolute; top: 8px; left: 12px; right: 12px; z-index: 7; display: grid; gap: 6px; pointer-events: none; }
+.toast { padding: 8px 12px; border-radius: 10px; background: rgba(27, 42, 73, 0.93); color: #fff; font-size: 13px; line-height: 1.4; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2); }

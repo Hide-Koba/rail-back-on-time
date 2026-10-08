@@ -4,7 +4,7 @@ import { TYPE_NAMES } from '../config.js';
 import { delaySec } from '../sim/timetable.js';
 import { routeTargetTrain, plannedTrack } from '../sim/dispatch.js';
 import {
-  computeBoardLayout, trainPosition, trainCenter, trackPath, pointCenter, hitTestTrain, hitTestPoint,
+  computeBoardLayout, trainPosition, trainCenter, trackPath, pointCenter, hitTestTrain, hitTestPoint, kmToY,
   STATION_BOX_PX,
 } from './layout.js';
 
@@ -43,6 +43,7 @@ export function createBoard(container, state, handlers = {}) {
   let queueText = null;
   let stationRecs = [];
   let focusRing = null;
+  let limitEls = []; // 速度規制の帯（イベントの順）
   let trainEls = new Map(); // trainId -> { g, nameText, delayText, badge, sel, ... }
   let lockEls = new Map(); // trainId -> 確定した進路の細い線
   const lastMinutes = new Map(); // trainId -> 直前に表示した遅延（分）。「−1」の演出に使う
@@ -71,6 +72,7 @@ export function createBoard(container, state, handlers = {}) {
       floats: el('g', { class: 'floats' }, svg),
     };
     stationRecs = state.layout.stations.map((st) => buildStationOverlay(st));
+    limitEls = (state.stage.events ?? []).map((ev) => (ev.type === 'speedLimit' ? buildLimit(ev) : null));
     focusRing = el('circle', { class: 'ring focus', r: 17, display: 'none' }, layers.rings);
     trainEls = new Map();
     lockEls = new Map();
@@ -133,6 +135,29 @@ export function createBoard(container, state, handlers = {}) {
     return { highlight, icon, ring };
   }
 
+  /** 速度規制の帯: 路線に重ねる琥珀色の帯と、「強風 170km/h」の文字。 */
+  function buildLimit(ev) {
+    const y0 = kmToY(geo, state.layout, ev.fromKm);
+    const y1 = kmToY(geo, state.layout, ev.toKm);
+    const g = el('g', { class: 'limit', display: 'none' }, layers.route);
+    el('rect', { class: 'limit-band', x: geo.cx - 9, y: y0, width: 18, height: Math.max(y1 - y0, 2), rx: 5 }, g);
+    el('text', { class: 'limit-label', x: geo.cx + 16, y: y0 + 14 }, g).textContent = `${ev.label} ${ev.kmh}km/h`;
+    return g;
+  }
+
+  /** 速度規制の帯の表示: 規制中は実線、10分以内に始まるなら点線（予告）、それ以外は隠す。 */
+  function renderLimits(st) {
+    (st.stage.events ?? []).forEach((ev, i) => {
+      const g = limitEls[i];
+      if (!g) return;
+      const active = st.timeSec >= ev.fromSec && st.timeSec < ev.toSec;
+      const soon = !active && st.timeSec < ev.fromSec && ev.fromSec - st.timeSec <= 600;
+      show(g, active || soon);
+      const cls = `limit ${active ? 'active' : 'soon'}`;
+      if (g.getAttribute('class') !== cls) g.setAttribute('class', cls);
+    });
+  }
+
   function createTrainEl(train) {
     const g = el('g', { class: `train t-${train.type}` }, layers.trains);
     const sel = el('rect', { class: 'sel-frame', x: -13, y: -27, width: 26, height: 31, rx: 5, display: 'none' }, g);
@@ -140,11 +165,17 @@ export function createBoard(container, state, handlers = {}) {
     const nameText = el('text', { class: 'train-name' }, g);
     nameText.textContent = `${TYPE_NAMES[train.type]} ${train.number}`;
     const delayText = el('text', { class: 'train-delay' }, g);
-    // 抑止中は赤い「抑」、予約中は点線の「抑」
-    const badge = el('g', { class: 'badge', display: 'none' }, g);
-    el('rect', { class: 'badge-bg', width: 15, height: 15, rx: 3 }, badge);
-    el('text', { class: 'badge-text', x: 7.5, y: 11.5, 'text-anchor': 'middle' }, badge).textContent = '抑';
-    const rec = { g, sel, nameText, delayText, badge, shown: '', mode: null };
+    // バッジ: 抑止中は赤い「抑」、予約中は点線の「抑」。運休の予約中は「休」、車両点検は「点」
+    const makeBadge = (cls, label) => {
+      const b = el('g', { class: cls, display: 'none' }, g);
+      el('rect', { class: 'badge-bg', width: 15, height: 15, rx: 3 }, b);
+      el('text', { class: 'badge-text', x: 7.5, y: 11.5, 'text-anchor': 'middle' }, b).textContent = label;
+      return b;
+    };
+    const badge = makeBadge('badge', '抑');
+    const badgeCancel = makeBadge('badge cancel', '休');
+    const badgeInspect = makeBadge('badge inspect', '点');
+    const rec = { g, sel, nameText, delayText, badge, badgeCancel, badgeInspect, shown: '', mode: null };
     trainEls.set(train.id, rec);
     return rec;
   }
@@ -162,11 +193,11 @@ export function createBoard(container, state, handlers = {}) {
     if (mode === 'track') {
       set(rec.nameText, 0, 12, 'middle');
       set(rec.delayText, 0, 22, 'middle');
-      rec.badge.setAttribute('transform', 'translate(12 -20)');
+      [rec.badge, rec.badgeCancel, rec.badgeInspect].forEach((b, i) => b.setAttribute('transform', `translate(${12 + 17 * i} -20)`));
     } else {
       set(rec.nameText, -12, -8, 'end');
       set(rec.delayText, 12, -8, 'start');
-      rec.badge.setAttribute('transform', 'translate(40 -19)');
+      [rec.badge, rec.badgeCancel, rec.badgeInspect].forEach((b, i) => b.setAttribute('transform', `translate(${40 + 17 * i} -19)`));
     }
   }
 
@@ -207,6 +238,9 @@ export function createBoard(container, state, handlers = {}) {
       const reserved = !held && !!t.holdAt;
       show(rec.badge, held || reserved);
       rec.badge.setAttribute('class', `badge ${held ? 'held' : 'reserved'}`);
+      show(rec.badgeCancel, t.cancelPending);
+      // 点検: 予定がある（まだ始まっていない）か、点検の臨時停車中
+      show(rec.badgeInspect, !!t.inspection && (!t.inspection.started || (t.inspectionUntil ?? 0) > st.timeSec));
     }
     const q = queued > 0 ? `待機 ${queued}本` : '';
     if (queueText.textContent !== q) queueText.textContent = q;
@@ -269,6 +303,7 @@ export function createBoard(container, state, handlers = {}) {
   function render(st, view = {}) {
     if (!svg) build();
     if (!svg) return;
+    renderLimits(st);
     renderLockedRoutes(st);
     renderPoints(st);
     renderTrains(st, view);

@@ -82,3 +82,28 @@ test('走行中の全ティックで、列車の y は進行方向に単調に�
     }
   }
 });
+
+test('km → y: 区間と駅の中で途切れずにつながり、線路の外は両端に丸める', async () => {
+  const { kmToY } = await import('../src/render/layout.js');
+  const sim = createState(stage1).layout;
+  const geo = computeBoardLayout(sim, { width: 375, height: 700 });
+  const st = geo.stations[0];
+  // 駅の上端・中心・下端
+  near(kmToY(geo, sim, sim.stations[0].upperKm), st.boxTop, 1e-9);
+  near(kmToY(geo, sim, 0), st.boxTop + STATION_BOX_PX / 2, 1e-9);
+  near(kmToY(geo, sim, sim.stations[0].lowerKm), st.boxBottom, 1e-9);
+  // 区間の中は、km に比例
+  near(kmToY(geo, sim, 5) - kmToY(geo, sim, 4), geo.pxPerKm, 1e-9);
+  // 単調に増える（細かく走査）
+  let prev = -Infinity;
+  for (let km = -12; km <= 42; km += 0.05) {
+    const y = kmToY(geo, sim, km);
+    assert.ok(y >= prev - 1e-9, `km=${km}`);
+    prev = y;
+  }
+  assert.equal(kmToY(geo, sim, -50), geo.entryY);
+  assert.equal(kmToY(geo, sim, 999), geo.stations.at(-1).boxBottom);
+  // 列車の座標と同じ対応: 番線の途中の列車の y と一致する
+  const t = { resId: 'aoba-2', km: 0.2 };
+  near(trainPosition(geo, sim, t).y, kmToY(geo, sim, 0.2), 1e-9);
+});

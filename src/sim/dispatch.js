@@ -14,6 +14,11 @@ export function validTracks(station, train) {
 
 const isFree = (state, track) => state.occ[track.id] == null;
 
+/** これから点検で臨時停車する駅か（まだ点検を始めていない）。 */
+export function inspectionPendingAt(train, station) {
+  return !!train.inspection && !train.inspection.started && train.inspection.stationId === station.id;
+}
+
 /** 終点の番線の「折り返しの残り時間」。まだ到着していない列車が入っている番線は、折り返し時間まるごと残っているとみなす。 */
 function remainingTurnaroundSec(state, station, track) {
   const occupant = state.trainById[state.occ[track.id]];
@@ -44,7 +49,7 @@ export function autoRoute(state, train, station) {
     return (cands.find((t) => isFree(state, t)) ?? cands[0]).id;
   }
 
-  if (train.holdAt === station.id) {
+  if (train.holdAt === station.id || inspectionPendingAt(train, station)) {
     const cands = [...subs, ...mains];
     return (cands.find((t) => isFree(state, t)) ?? cands[0]).id;
   }

@@ -29,6 +29,7 @@ export function showTitle(root, { stages, best, onSelect }) {
           <li>遅れた列車をタップして「抑止」すると、駅でその列車を待たせて、後ろの速達を先に通せます。</li>
           <li>駅の入口にあるポイントのマークをタップすると、近づく列車が入る番線を切り替えられます。</li>
           <li>全員の遅れ（遅延損失）を、何もしないときより減らすと星がもらえます。</li>
+          <li>ステージ2では指令カードが使えます。運休は遅れの大きい列車に（遅れが60分に満たない列車を運休にすると、かえって損失が増えます）、折返し短縮は終点で折り返し中の列車に使います。</li>
         </ol>
       </section>
     </div>`;
@@ -46,7 +47,7 @@ export function showResult(root, { stage, state, result, baseline, rate, starsEa
     const cls = Math.abs(diff) < 6 ? '' : diff < 0 ? 'good' : 'bad';
     return `<tr>
       <td><span class="chip t-${t.type}">${TYPE_NAMES[t.type]} ${t.number}</span></td>
-      <td class="num">${minutes(self)}分${t.unfinished ? '<small>（未着）</small>' : ''}</td>
+      <td class="num">${t.cancelled ? '運休<small>（60分扱い）</small>' : `${minutes(self)}分${t.unfinished ? '<small>（未着）</small>' : ''}`}</td>
       <td class="num ${cls}">${minutes(diff)}分</td>
     </tr>`;
   }).join('');

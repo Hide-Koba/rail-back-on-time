@@ -60,9 +60,9 @@ export function delaySec(state, train, now = state.timeSec) {
     case 'dwelling': {
       const stId = state.layout.resources[train.resId].stationId;
       const sched = tt.byStation[stId];
-      return train.dwellKind === 'sched'
-        ? Math.max(now, train.arrivedSec + MIN_DWELL_SEC) - sched.depSec
-        : Math.max(now, train.arrivedSec + OP_STOP_MIN_SEC) - sched.arrSec;
+      const earliest = train.arrivedSec + (train.dwellKind === 'sched' ? MIN_DWELL_SEC : OP_STOP_MIN_SEC);
+      const leaveAt = Math.max(now, earliest, train.inspectionUntil ?? 0); // 点検中はその終了まで出られない
+      return leaveAt - (train.dwellKind === 'sched' ? sched.depSec : sched.arrSec);
     }
     default: // turnaround / done
       return train.finalDelaySec;

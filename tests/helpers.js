@@ -6,7 +6,7 @@ const pair = (s) => [
   { id: `${s}-2`, label: '2番線', isMain: false, hasPlatform: true },
 ];
 
-export function lineStage({ trains, terminalTracks = 3, turnaroundSec = 300, maxDurationSec = 7200 }) {
+export function lineStage({ trains, terminalTracks = 3, turnaroundSec = 300, maxDurationSec = 7200, cards, events }) {
   return {
     id: 'test-line',
     title: 'test',
@@ -26,6 +26,8 @@ export function lineStage({ trains, terminalTracks = 3, turnaroundSec = 300, max
       },
     ],
     trains,
+    ...(cards ? { cards } : {}),
+    ...(events ? { events } : {}),
     stars: { two: 0.15, three: 0.3 },
     tutorial: [],
   };

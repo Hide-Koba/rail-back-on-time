@@ -1,6 +1,7 @@
 // プレイヤーのコマンドの適用。SPEC.md §3.10。
 // 無効なコマンドは何もせず false を返す（例外は投げない）。
 import { validTracks } from './dispatch.js';
+import { cancelTrain, shortenTurnaround } from './cards.js';
 
 export function applyCommand(state, cmd) {
   const train = state.trainById[cmd.trainId];
@@ -12,6 +13,10 @@ export function applyCommand(state, cmd) {
       return hold(state, train);
     case 'release':
       return release(train);
+    case 'cancel': // 指令カード: 運休（次の停車駅で打ち切り）
+      return cancelTrain(state, train);
+    case 'shortenTurnaround': // 指令カード: 折返し短縮（終点で折り返し中の列車）
+      return shortenTurnaround(state, train);
     default:
       return false;
   }

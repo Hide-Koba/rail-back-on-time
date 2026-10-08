@@ -18,13 +18,15 @@ export function createHud(root, { title, onTogglePause, onSpeed, onBack }) {
     <div class="hud-row hud-controls">
       <button type="button" class="btn btn-pause"></button>
       ${SPEED_MULTIPLIERS.map((m, i) => `<button type="button" class="btn btn-speed" data-speed="${i}">${m}x</button>`).join('')}
-    </div>`;
+    </div>
+    <div class="hud-cards" hidden></div>`;
   const $ = (sel) => root.querySelector(sel);
   const titleEl = $('.hud-title');
   const clockEl = $('.hud-clock');
   const delayEl = $('.hud-delay b');
   const pauseBtn = $('.btn-pause');
   const speedBtns = [...root.querySelectorAll('.btn-speed')];
+  const cardsEl = $('.hud-cards');
   titleEl.textContent = title;
 
   $('.hud-back').addEventListener('click', onBack);
@@ -38,13 +40,16 @@ export function createHud(root, { title, onTogglePause, onSpeed, onBack }) {
 
   return {
     /** blocked: チュートリアルの案内で自動的に止まっている */
-    update({ clockSec, totalDelayMin, paused, speedIndex, finished, blocked }) {
+    update({ clockSec, totalDelayMin, paused, speedIndex, finished, blocked, cards }) {
       setText('clock', clockEl, formatClock(clockSec));
       setText('delay', delayEl, String(totalDelayMin));
       setText('pause', pauseBtn, finished ? '終了' : blocked ? '案内を確認' : paused ? '▶ 再開' : '⏸ 一時停止');
       pauseBtn.disabled = finished || blocked;
       pauseBtn.classList.toggle('on', (paused || blocked) && !finished);
       speedBtns.forEach((b, i) => b.classList.toggle('on', i === speedIndex));
+      // 指令カードの残り（ステージにカードがあるときだけ）
+      cardsEl.hidden = !cards;
+      if (cards) setText('cards', cardsEl, `指令カード　運休 ${cards.cancel}　折返し短縮 ${cards.shorten}`);
     },
   };
 }

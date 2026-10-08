@@ -92,3 +92,45 @@ test('スコア: 遅延損失は 乗客数 × 遅延[分] の合計、負の遅�
   assert.equal(starCount({ stars: { two: 0.15, three: 0.3 } }, 0.3), 3);
   assert.equal(starCount({ stars: { two: 0.15, three: 0.3 } }, -1), 1);
 });
+
+// ---- M4: 指令カード・イベント（ステージ2） ----
+const IN_SERVICE = ['running', 'signal', 'dwelling'];
+const cancelOnEntry = (id) => ({ when: (s) => IN_SERVICE.includes(s.trainById[id].status), command: { type: 'cancel', trainId: id } });
+// 終点で折り返し中の列車に、折返し短縮を使い切るまで使う（先に着いた列車から）
+const shortenAtTerminal = {
+  when: (s) => s.trains.some((t) => t.status === 'turnaround' && !t.turnaroundShortened),
+  command: (s) => ({ type: 'shortenTurnaround', trainId: s.trains.find((t) => t.status === 'turnaround' && !t.turnaroundShortened).id }),
+  once: false,
+};
+const rateOf = (stage, schedule) => improvementRate(runHeadless(stage, schedule).loss, baselineResult(stage).loss);
+
+test('M4: ステージ2は、指令カード（運休2・折返し短縮3）とイベント（速度規制・車両点検）を持つ', () => {
+  assert.deepEqual(stage2.cards, { cancel: 2, shorten: 3 });
+  assert.deepEqual(stage2.events.map((e) => e.type).sort(), ['inspection', 'speedLimit']);
+  const r = runHeadless(stage2);
+  const kinds = r.state.notices.map((n) => n.kind);
+  assert.ok(kinds.includes('limitStart') && kinds.includes('limitEnd') && kinds.includes('inspection'), kinds.join(','));
+});
+
+test('M4: 遅れの大きい列車を運休にし、折返し短縮も使うと、ステージ2で★3に届く（T9 の代わりの確認）', () => {
+  const rate = rateOf(stage2, [cancelOnEntry('L844'), cancelOnEntry('R660'), shortenAtTerminal]);
+  assert.ok(rate >= stage2.stars.three, `改善率 ${(rate * 100).toFixed(1)}%`);
+  assert.equal(starCount(stage2, rate), 3);
+});
+
+test('M4: カードの使いどころで差が出る（折返し短縮だけでは★2に届かず、遅れの小さい列車の運休は逆効果）', () => {
+  const shortenOnly = rateOf(stage2, [shortenAtTerminal]);
+  assert.ok(shortenOnly > 0 && shortenOnly < stage2.stars.two, `折返し短縮のみ ${(shortenOnly * 100).toFixed(1)}%`);
+  const cancelOnly = rateOf(stage2, [cancelOnEntry('L844'), cancelOnEntry('R660')]);
+  assert.ok(cancelOnly >= stage2.stars.two, `運休のみ ${(cancelOnly * 100).toFixed(1)}%`);
+  // 遅延が60分未満の列車は、運休にすると損失が増える（遅延損失は「乗客数 × 60分」になるため）
+  const wasteful = rateOf(stage2, [cancelOnEntry('S104'), cancelOnEntry('S48'), shortenAtTerminal]);
+  assert.ok(wasteful < 0, `遅れの小さい列車の運休 ${(wasteful * 100).toFixed(1)}%`);
+});
+
+test('M4: 運休カードは回数を超えて使えない（3本目は無効）', () => {
+  const r = runHeadless(stage2, [cancelOnEntry('L844'), cancelOnEntry('R660'), cancelOnEntry('S38')]);
+  const cancelled = r.state.trains.filter((t) => t.cancelled).map((t) => t.id);
+  assert.deepEqual(cancelled.sort(), ['L844', 'R660']);
+  assert.equal(r.state.cards.cancel, 0);
+});
